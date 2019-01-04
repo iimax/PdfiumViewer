@@ -64,6 +64,20 @@ namespace PdfiumViewer
                 e.PageSettings.Landscape = landscape;
             }
 
+            if (_settings.MultiplePages != null) // multiple page per sheet printing
+            {
+                if (_settings.MultiplePages.Horizontal == 1 || _settings.MultiplePages.Vertical == 1)
+                {
+                    bool landscape = GetOrientation(_document.PageSizes[_currentPage]) == Orientation.Landscape;
+
+                    if (inverseLandscape)
+                        landscape = !landscape;
+
+                    e.PageSettings.Landscape = !landscape;
+                    System.Diagnostics.Debug.WriteLine(string.Format("page# {0} reverse landscape to {1}", _currentPage * (_settings.MultiplePages.Horizontal * _settings.MultiplePages.Vertical), e.PageSettings.Landscape));
+                }
+            }
+
             base.OnQueryPageSettings(e);
         }
 
@@ -100,9 +114,15 @@ namespace PdfiumViewer
                     {
                         int page = _currentPage * pagesPerPage;
                         if (settings.Orientation == System.Windows.Forms.Orientation.Horizontal)
-                            page += vertical * settings.Vertical + horizontal;
+                        {
+                            //page += vertical * settings.Vertical + horizontal;
+                            page += vertical * settings.Horizontal + horizontal;
+                        }
                         else
-                            page += horizontal * settings.Horizontal + vertical;
+                        {
+                            //page += horizontal * settings.Horizontal + vertical;
+                            page += horizontal * settings.Vertical + vertical;
+                        }
 
                         if (page >= _document.PageCount)
                             continue;
