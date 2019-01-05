@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Drawing.Printing;
 using System.Text;
 
@@ -66,7 +68,7 @@ namespace PdfiumViewer
 
             if (_settings.MultiplePages != null) // multiple page per sheet printing
             {
-                if (_settings.MultiplePages.Horizontal == 1 || _settings.MultiplePages.Vertical == 1)
+                if (_settings.MultiplePages.Horizontal == 1 || _settings.MultiplePages.Vertical == 1) //reverse landscape to get best size
                 {
                     bool landscape = GetOrientation(_document.PageSizes[_currentPage]) == Orientation.Landscape;
 
@@ -75,6 +77,16 @@ namespace PdfiumViewer
 
                     e.PageSettings.Landscape = !landscape;
                     System.Diagnostics.Debug.WriteLine(string.Format("page# {0} reverse landscape to {1}", _currentPage * (_settings.MultiplePages.Horizontal * _settings.MultiplePages.Vertical), e.PageSettings.Landscape));
+                }
+                else
+                {
+                    //keep it's landscape
+                    bool landscape = GetOrientation(_document.PageSizes[_currentPage]) == Orientation.Landscape;
+
+                    if (inverseLandscape)
+                        landscape = !landscape;
+
+                    e.PageSettings.Landscape = landscape;
                 }
             }
 
@@ -86,7 +98,7 @@ namespace PdfiumViewer
             OnBeforePrintPage(e);
 
             if (_settings.MultiplePages != null)
-                PrintMultiplePages(e);
+                PrintMultiplePagesAdvanced(e);
             else
                 PrintSinglePage(e);
 
@@ -246,5 +258,164 @@ namespace PdfiumViewer
             Portrait,
             Landscape
         }
+        
+        /// <summary>
+        /// 每页pdf内容输出在物理纸张上的坐标
+        /// </summary>
+        private List<RectangleF> lstPdfPagePrintArea = new List<RectangleF>();
+        
+        /// <summary>
+        /// 新版MultiPagesPerSheet打印
+        /// </summary>
+        /// <param name="e"></param>
+        private void PrintMultiplePagesAdvanced(PrintPageEventArgs e)
+        {
+            var settings = _settings.MultiplePages;
+
+            int pagesPerPage = settings.Horizontal * settings.Vertical;
+            int pageCount = (_document.PageCount - 1) / pagesPerPage + 1;
+
+            
+            
+            if (_currentPage < pageCount)
+            {
+                float width = e.PageBounds.Width - e.PageSettings.HardMarginX * 2;
+                float height = e.PageBounds.Height - e.PageSettings.HardMarginY * 2;
+
+                float widthPerPage = (width - (settings.Horizontal - 1) * settings.Margin) / settings.Horizontal;
+                float heightPerPage = (height - (settings.Vertical - 1) * settings.Margin) / settings.Vertical;
+                //提前根据用户自定义布局，计算好每页pdf内容输出的坐标：
+                if (_settings.MultiPageLayout.MultiPageOrder == PdfMultiPageOrder.Horizontal)
+                {
+                    if (lstPdfPagePrintArea.Count == 0)
+                    {
+                        //第一页的内容
+                        float x = 0;
+                        float y = 0;
+                        int drawedPages = 0;
+                        for (int physicalPage = 0; physicalPage < pageCount; physicalPage++)
+                        {
+                            x = 0;
+                            y = 0;
+
+                            for (int i = 0; i < _settings.MultiPageLayout.Rows; i++)
+                            {
+                                for (int j = 0; j < _settings.MultiPageLayout.Columns; j++)
+                                {
+                                    lstPdfPagePrintArea.Add(new RectangleF(x, y, widthPerPage, heightPerPage));
+                                    x += widthPerPage + settings.Margin;
+                                    drawedPages++;
+                                    if (drawedPages >= _document.PageCount)
+                                    {
+                                        break;
+                                    }
+                                }
+                                if (drawedPages >= _document.PageCount)
+                                {
+                                    break;
+                                }
+                                x = 0;
+                                y += heightPerPage + settings.Margin;
+                            }
+                        }
+                    }
+
+                    
+                }
+                else if (_settings.MultiPageLayout.MultiPageOrder == PdfMultiPageOrder.Vertical)
+                {
+                    //按从上到下顺序输出页面
+                    if (lstPdfPagePrintArea.Count == 0)
+                    {
+                        //第一页的内容
+                        float x = 0;
+                        float y = 0;
+                        int drawedPages = 0;
+                        for (int physicalPage = 0; physicalPage < pageCount; physicalPage++)
+                        {
+                            x = 0;
+                            y = 0;
+
+                            for (int i = 0; i < _settings.MultiPageLayout.Columns; i++)
+                            {
+                                for (int j = 0; j < _settings.MultiPageLayout.Rows; j++)
+                                {
+                                    lstPdfPagePrintArea.Add(new RectangleF(x, y, widthPerPage, heightPerPage));
+                                    y += heightPerPage + settings.Margin;
+                                    drawedPages++;
+                                    if (drawedPages >= _document.PageCount)
+                                    {
+                                        break;
+                                    }
+                                }
+                                if (drawedPages >= _document.PageCount)
+                                {
+                                    break;
+                                }
+                                y = 0;
+                                x += widthPerPage + settings.Margin;
+                            }
+                            
+                        }
+                    }
+                }
+
+                //读取坐标，模拟画一个边框
+                int page = _currentPage * pagesPerPage;
+                for (int i = page; i < lstPdfPagePrintArea.Count; i++)
+                {
+                    var image = _document.Render(i, e.Graphics.DpiX, e.Graphics.DpiY, true);
+                    //保持原始page宽高比例
+                    var destWidth = (float)lstPdfPagePrintArea[i].Width;
+                    var destHeight = (float)lstPdfPagePrintArea[i].Height;
+
+                    var xRatio = destWidth / image.Width;
+                    var yRatio = destHeight / image.Height;
+
+                    var ratio = Math.Min(xRatio, yRatio);
+                    float printWidth = image.Width;
+                    float printHeight = image.Height;
+                    if (ratio < 1)
+                    {
+                        printWidth = printWidth * ratio;
+                        printHeight = printHeight * ratio;
+                    }
+                    e.Graphics.DrawImage(image, lstPdfPagePrintArea[i].X, lstPdfPagePrintArea[i].Y, printWidth, printHeight);
+
+                    float centerX = lstPdfPagePrintArea[i].X + lstPdfPagePrintArea[i].Width / 2;
+                    float centerY = lstPdfPagePrintArea[i].Y + lstPdfPagePrintArea[i].Height / 2;
+                    e.Graphics.DrawString(string.Format("#{0}", i + 1), new Font("微软雅黑", 22), Brushes.Red, centerX, centerY);
+
+
+                    if (_settings.MultiPageLayout.DrawBorder)
+                    {
+                        e.Graphics.DrawRectangle(Pens.Black, lstPdfPagePrintArea[i].X, lstPdfPagePrintArea[i].Y, lstPdfPagePrintArea[i].Width, lstPdfPagePrintArea[i].Height);
+                    }
+
+
+                    if (i >= page + pagesPerPage - 1)
+                    {
+                        break;
+                    }
+                }
+
+                //// Set world transform of graphics object to rotate.
+                //e.Graphics.RotateTransform(30.0F);
+
+                //// Then to scale, prepending to world transform.
+                //e.Graphics.ScaleTransform(3.0F, 1.0F);
+
+                //// Draw scaled, rotated rectangle to screen.
+                //e.Graphics.DrawRectangle(new Pen(Color.Blue, 3), 50, 0, 100, 40);
+
+                _currentPage++;
+            }
+
+            if (PrinterSettings.ToPage > 0)
+                pageCount = Math.Min(PrinterSettings.ToPage, pageCount);
+
+            e.HasMorePages = _currentPage < pageCount;
+        }
+        
     }
 }

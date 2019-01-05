@@ -71,6 +71,10 @@
     <Compile Include="PdfBookmarkCollection.cs" />
     <Compile Include="PdfiumResolveEventHandler.cs" />
     <Compile Include="PdfiumResolver.cs" />
+    <Compile Include="PdfMultiPageOrder.cs" />
+    <Compile Include="PdfPageLayoutMode.cs" />
+    <Compile Include="PdfPageScalingMode.cs" />
+    <Compile Include="PdfPrintMultiPageLayout.cs" />
     <Compile Include="PdfPrintMultiplePages.cs" />
     <Compile Include="PdfPrintSettings.cs" />
     <Compile Include="PdfRectangle.cs" />

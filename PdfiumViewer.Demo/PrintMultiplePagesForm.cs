@@ -51,7 +51,9 @@ namespace PdfiumViewer.Demo
                         margin
                     )
                 );
-
+                settings.SetMultiPageLayout(vertical, horizontal, true, _horizontalOrientation.Checked ? PdfMultiPageOrder.Horizontal : PdfMultiPageOrder.Vertical);
+                settings.PrinterName = "";
+                
                 using (var form = new PrintPreviewDialog())
                 {
                     form.Document = _viewer.Document.CreatePrintDocument(settings);
