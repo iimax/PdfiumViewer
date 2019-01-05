@@ -69,6 +69,8 @@
       <DependentUpon>PasswordForm.cs</DependentUpon>
     </Compile>
     <Compile Include="PdfBookmarkCollection.cs" />
+    <Compile Include="PdfiumResolveEventHandler.cs" />
+    <Compile Include="PdfiumResolver.cs" />
     <Compile Include="PdfPrintMultiplePages.cs" />
     <Compile Include="PdfPrintSettings.cs" />
     <Compile Include="PdfRectangle.cs" />
@@ -149,16 +151,6 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="pan.cur" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="..\Libraries\Pdfium\x64\pdfium.dll">
-      <Link>x64\pdfium.dll</Link>
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
-    <Content Include="..\Libraries\Pdfium\x86\pdfium.dll">
-      <Link>x86\pdfium.dll</Link>
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

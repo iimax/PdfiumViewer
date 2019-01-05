@@ -289,13 +289,29 @@ namespace PdfiumViewer
         /// <returns>The rendered image.</returns>
         public Image Render(int page, int width, int height, float dpiX, float dpiY, PdfRenderFlags flags)
         {
+            return Render(page, width, height, dpiX, dpiY, 0, flags);
+        }
+
+        /// <summary>
+        /// Renders a page of the PDF document to an image.
+        /// </summary>
+        /// <param name="page">Number of the page to render.</param>
+        /// <param name="width">Width of the rendered image.</param>
+        /// <param name="height">Height of the rendered image.</param>
+        /// <param name="dpiX">Horizontal DPI.</param>
+        /// <param name="dpiY">Vertical DPI.</param>
+        /// <param name="rotate">Rotation.</param>
+        /// <param name="flags">Flags used to influence the rendering.</param>
+        /// <returns>The rendered image.</returns>
+        public Image Render(int page, int width, int height, float dpiX, float dpiY, PdfRotation rotate, PdfRenderFlags flags)
+        {
             if (_disposed)
                 throw new ObjectDisposedException(GetType().Name);
 
             if ((flags & PdfRenderFlags.CorrectFromDpi) != 0)
             {
-                width = width / 72 * (int)dpiX;
-                height = height / 72 * (int)dpiY;
+                width = width * (int)dpiX / 72;
+                height = height * (int)dpiY / 72;
             }
 
             var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
@@ -318,7 +334,9 @@ namespace PdfiumViewer
                         handle,
                         (int)dpiX, (int)dpiY,
                         0, 0, width, height,
-                        FlagsToFPDFFlags(flags)
+                        (int)rotate,
+                        FlagsToFPDFFlags(flags),
+                        (flags & PdfRenderFlags.Annotations) != 0
                     );
 
                     if (!success)
@@ -339,7 +357,7 @@ namespace PdfiumViewer
 
         private NativeMethods.FPDF FlagsToFPDFFlags(PdfRenderFlags flags)
         {
-            return (NativeMethods.FPDF)(flags & ~PdfRenderFlags.Transparent);
+            return (NativeMethods.FPDF)(flags & ~(PdfRenderFlags.Transparent | PdfRenderFlags.CorrectFromDpi));
         }
 
         /// <summary>
@@ -440,6 +458,50 @@ namespace PdfiumViewer
         public IList<PdfRectangle> GetTextBounds(PdfTextSpan textSpan)
         {
             return _file.GetTextBounds(textSpan);
+        }
+
+        /// <summary>
+        /// Convert a point from device coordinates to page coordinates.
+        /// </summary>
+        /// <param name="page">The page number where the point is from.</param>
+        /// <param name="point">The point to convert.</param>
+        /// <returns>The converted point.</returns>
+        public PointF PointToPdf(int page, Point point)
+        {
+            return _file.PointToPdf(page, point);
+        }
+
+        /// <summary>
+        /// Convert a point from page coordinates to device coordinates.
+        /// </summary>
+        /// <param name="page">The page number where the point is from.</param>
+        /// <param name="point">The point to convert.</param>
+        /// <returns>The converted point.</returns>
+        public Point PointFromPdf(int page, PointF point)
+        {
+            return _file.PointFromPdf(page, point);
+        }
+
+        /// <summary>
+        /// Convert a rectangle from device coordinates to page coordinates.
+        /// </summary>
+        /// <param name="page">The page where the rectangle is from.</param>
+        /// <param name="rect">The rectangle to convert.</param>
+        /// <returns>The converted rectangle.</returns>
+        public RectangleF RectangleToPdf(int page, Rectangle rect)
+        {
+            return _file.RectangleToPdf(page, rect);
+        }
+
+        /// <summary>
+        /// Convert a rectangle from page coordinates to device coordinates.
+        /// </summary>
+        /// <param name="page">The page where the rectangle is from.</param>
+        /// <param name="rect">The rectangle to convert.</param>
+        /// <returns>The converted rectangle.</returns>
+        public Rectangle RectangleFromPdf(int page, RectangleF rect)
+        {
+            return _file.RectangleFromPdf(page, rect);
         }
 
         /// <summary>

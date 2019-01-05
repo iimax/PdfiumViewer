@@ -94,6 +94,19 @@ namespace PdfiumViewer
         Image Render(int page, int width, int height, float dpiX, float dpiY, PdfRenderFlags flags);
 
         /// <summary>
+        /// Renders a page of the PDF document to an image.
+        /// </summary>
+        /// <param name="page">Number of the page to render.</param>
+        /// <param name="width">Width of the rendered image.</param>
+        /// <param name="height">Height of the rendered image.</param>
+        /// <param name="dpiX">Horizontal DPI.</param>
+        /// <param name="dpiY">Vertical DPI.</param>
+        /// <param name="rotate">Rotation.</param>
+        /// <param name="flags">Flags used to influence the rendering.</param>
+        /// <returns>The rendered image.</returns>
+        Image Render(int page, int width, int height, float dpiX, float dpiY, PdfRotation rotate, PdfRenderFlags flags);
+
+        /// <summary>
         /// Save the PDF document to the specified location.
         /// </summary>
         /// <param name="path">Path to save the PDF document to.</param>
@@ -207,5 +220,37 @@ namespace PdfiumViewer
         /// <param name="textSpan">The span to get the bounding rectangles for.</param>
         /// <returns>The bounding rectangles.</returns>
         IList<PdfRectangle> GetTextBounds(PdfTextSpan textSpan);
+
+        /// <summary>
+        /// Convert a point from device coordinates to page coordinates.
+        /// </summary>
+        /// <param name="page">The page number where the point is from.</param>
+        /// <param name="point">The point to convert.</param>
+        /// <returns>The converted point.</returns>
+        PointF PointToPdf(int page, Point point);
+
+        /// <summary>
+        /// Convert a point from page coordinates to device coordinates.
+        /// </summary>
+        /// <param name="page">The page number where the point is from.</param>
+        /// <param name="point">The point to convert.</param>
+        /// <returns>The converted point.</returns>
+        Point PointFromPdf(int page, PointF point);
+
+        /// <summary>
+        /// Convert a rectangle from device coordinates to page coordinates.
+        /// </summary>
+        /// <param name="page">The page where the rectangle is from.</param>
+        /// <param name="rect">The rectangle to convert.</param>
+        /// <returns>The converted rectangle.</returns>
+        RectangleF RectangleToPdf(int page, Rectangle rect);
+
+        /// <summary>
+        /// Convert a rectangle from page coordinates to device coordinates.
+        /// </summary>
+        /// <param name="page">The page where the rectangle is from.</param>
+        /// <param name="rect">The rectangle to convert.</param>
+        /// <returns>The converted rectangle.</returns>
+        Rectangle RectangleFromPdf(int page, RectangleF rect);
     }
 }

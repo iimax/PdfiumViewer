@@ -53,14 +53,20 @@ namespace PdfiumViewer
             return true;
         }
 
-        public bool RenderPDFPageToBitmap(int pageNumber, IntPtr bitmapHandle, int dpiX, int dpiY, int boundsOriginX, int boundsOriginY, int boundsWidth, int boundsHeight, NativeMethods.FPDF flags)
+        public bool RenderPDFPageToBitmap(int pageNumber, IntPtr bitmapHandle, int dpiX, int dpiY, int boundsOriginX, int boundsOriginY, int boundsWidth, int boundsHeight, int rotate, NativeMethods.FPDF flags, bool renderFormFill)
         {
             if (_disposed)
                 throw new ObjectDisposedException(GetType().Name);
 
             using (var pageData = new PageData(_document, _form, pageNumber))
             {
-                NativeMethods.FPDF_RenderPageBitmap(bitmapHandle, pageData.Page, boundsOriginX, boundsOriginY, boundsWidth, boundsHeight, 0, flags);
+                if (renderFormFill)
+                    flags &= ~NativeMethods.FPDF.ANNOT;
+
+                NativeMethods.FPDF_RenderPageBitmap(bitmapHandle, pageData.Page, boundsOriginX, boundsOriginY, boundsWidth, boundsHeight, rotate, flags);
+
+                if (renderFormFill)
+                    NativeMethods.FPDF_FFLDraw(_form, bitmapHandle, pageData.Page, boundsOriginX, boundsOriginY, boundsWidth, boundsHeight, rotate, flags);
             }
 
             return true;
@@ -101,39 +107,8 @@ namespace PdfiumViewer
 
                     if (NativeMethods.FPDFLink_GetAnnotRect(annotation, rect) && (target.HasValue || uri != null))
                     {
-                        int deviceX1;
-                        int deviceY1;
-                        int deviceX2;
-                        int deviceY2;
-
-                        NativeMethods.FPDF_PageToDevice(
-                            pageData.Page,
-                            0,
-                            0,
-                            pageSize.Width,
-                            pageSize.Height,
-                            0,
-                            rect.left,
-                            rect.top,
-                            out deviceX1,
-                            out deviceY1
-                        );
-
-                        NativeMethods.FPDF_PageToDevice(
-                            pageData.Page,
-                            0,
-                            0,
-                            pageSize.Width,
-                            pageSize.Height,
-                            0,
-                            rect.right,
-                            rect.bottom,
-                            out deviceX2,
-                            out deviceY2
-                        );
-
                         links.Add(new PdfPageLink(
-                            new Rectangle(deviceX1, deviceY1, deviceX2 - deviceX1, deviceY2 - deviceY1),
+                            new RectangleF(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top),
                             target,
                             uri
                         ));
@@ -181,10 +156,20 @@ namespace PdfiumViewer
             NativeMethods.FPDF_GetDocPermissions(_document);
 
             _formCallbacks = new NativeMethods.FPDF_FORMFILLINFO();
-            _formCallbacksHandle = GCHandle.Alloc(_formCallbacks);
-            _formCallbacks.version = 1;
+            _formCallbacksHandle = GCHandle.Alloc(_formCallbacks, GCHandleType.Pinned);
 
-            _form = NativeMethods.FPDFDOC_InitFormFillEnvironment(_document, ref _formCallbacks);
+            // Depending on whether XFA support is built into the PDFium library, the version
+            // needs to be 1 or 2. We don't really care, so we just try one or the other.
+
+            for (int i = 1; i <= 2; i++)
+            {
+                _formCallbacks.version = i;
+
+                _form = NativeMethods.FPDFDOC_InitFormFillEnvironment(_document, _formCallbacks);
+                if (_form != IntPtr.Zero)
+                    break;
+            }
+
             NativeMethods.FPDF_SetFormFieldHighlightColor(_form, 0, 0xFFE4DD);
             NativeMethods.FPDF_SetFormFieldHighlightAlpha(_form, 100);
 
@@ -303,6 +288,126 @@ namespace PdfiumViewer
             }
         }
 
+        public Point PointFromPdf(int page, PointF point)
+        {
+            using (var pageData = new PageData(_document, _form, page))
+            {
+                NativeMethods.FPDF_PageToDevice(
+                    pageData.Page,
+                    0,
+                    0,
+                    (int)pageData.Width,
+                    (int)pageData.Height,
+                    0,
+                    point.X,
+                    point.Y,
+                    out var deviceX,
+                    out var deviceY
+                );
+
+                return new Point(deviceX, deviceY);
+            }
+        }
+
+        public Rectangle RectangleFromPdf(int page, RectangleF rect)
+        {
+            using (var pageData = new PageData(_document, _form, page))
+            {
+                NativeMethods.FPDF_PageToDevice(
+                    pageData.Page,
+                    0,
+                    0,
+                    (int)pageData.Width,
+                    (int)pageData.Height,
+                    0,
+                    rect.Left,
+                    rect.Top,
+                    out var deviceX1,
+                    out var deviceY1
+                );
+
+                NativeMethods.FPDF_PageToDevice(
+                    pageData.Page,
+                    0,
+                    0,
+                    (int)pageData.Width,
+                    (int)pageData.Height,
+                    0,
+                    rect.Right,
+                    rect.Bottom,
+                    out var deviceX2,
+                    out var deviceY2
+                );
+
+                return new Rectangle(
+                    deviceX1,
+                    deviceY1,
+                    deviceX2 - deviceX1,
+                    deviceY2 - deviceY1
+                );
+            }
+        }
+
+        public PointF PointToPdf(int page, Point point)
+        {
+            using (var pageData = new PageData(_document, _form, page))
+            {
+                NativeMethods.FPDF_DeviceToPage(
+                    pageData.Page,
+                    0,
+                    0,
+                    (int)pageData.Width,
+                    (int)pageData.Height,
+                    0,
+                    point.X,
+                    point.Y,
+                    out var deviceX,
+                    out var deviceY
+                );
+
+                return new PointF((float)deviceX, (float)deviceY);
+            }
+        }
+
+        public RectangleF RectangleToPdf(int page, Rectangle rect)
+        {
+            using (var pageData = new PageData(_document, _form, page))
+            {
+                NativeMethods.FPDF_DeviceToPage(
+                    pageData.Page,
+                    0,
+                    0,
+                    (int)pageData.Width,
+                    (int)pageData.Height,
+                    0,
+                    rect.Left,
+                    rect.Top,
+                    out var deviceX1,
+                    out var deviceY1
+                );
+
+                NativeMethods.FPDF_DeviceToPage(
+                    pageData.Page,
+                    0,
+                    0,
+                    (int)pageData.Width,
+                    (int)pageData.Height,
+                    0,
+                    rect.Right,
+                    rect.Bottom,
+                    out var deviceX2,
+                    out var deviceY2
+                );
+
+                return new RectangleF(
+                    (float)deviceX1,
+                    (float)deviceY1,
+                    (float)(deviceX2 - deviceX1),
+                    (float)(deviceY2 - deviceY1)
+                );
+            }
+        }
+
         private IList<PdfRectangle> GetTextBounds(IntPtr textPage, int page, int index, int matchLength)
         {
             var result = new List<PdfRectangle>();
@@ -322,8 +427,8 @@ namespace PdfiumViewer
                     AreClose(lastBounds.Value.Bottom, bounds.Bottom)
                 )
                 {
-                    float top = Math.Min(lastBounds.Value.Top, bounds.Top);
-                    float bottom = Math.Max(lastBounds.Value.Bottom, bounds.Bottom);
+                    float top = Math.Max(lastBounds.Value.Top, bounds.Top);
+                    float bottom = Math.Min(lastBounds.Value.Bottom, bounds.Bottom);
 
                     lastBounds = new RectangleF(
                         lastBounds.Value.Left,
@@ -351,14 +456,20 @@ namespace PdfiumViewer
 
         private RectangleF GetBounds(IntPtr textPage, int index)
         {
-            double left, right, bottom, top;
-            NativeMethods.FPDFText_GetCharBox(textPage, index, out left, out right, out bottom, out top);
+            NativeMethods.FPDFText_GetCharBox(
+                textPage,
+                index,
+                out var left,
+                out var right,
+                out var bottom,
+                out var top
+            );
 
             return new RectangleF(
                 (float)left,
-                (float)bottom,
+                (float)top,
                 (float)(right - left),
-                (float)(top - bottom)
+                (float)(bottom - top)
             );
         }
 
@@ -500,7 +611,7 @@ namespace PdfiumViewer
                 if (_form != IntPtr.Zero)
                 {
                     NativeMethods.FORM_DoDocumentAAction(_form, NativeMethods.FPDFDOC_AACTION.WC);
-                    NativeMethods.FPDFDOC_ExitFormFillEnviroument(_form);
+                    NativeMethods.FPDFDOC_ExitFormFillEnvironment(_form);
                     _form = IntPtr.Zero;
                 }
 
