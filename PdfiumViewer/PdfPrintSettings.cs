@@ -31,7 +31,8 @@ namespace PdfiumViewer
         {
             Mode = mode;
             MultiplePages = multiplePages;
-            
+
+            MultiPageLayout = new PdfPrintMultiPageLayout();
         }
 
         /// <summary>

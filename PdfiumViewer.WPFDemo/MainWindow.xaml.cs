@@ -36,7 +36,7 @@ namespace PdfiumViewer.WPFDemo
 
             try
             {
-                for (int i = 1; i < pdfDoc.PageCount; i++)
+                for (int i = 0; i < pdfDoc.PageCount; i++)
                 {
                     imageMemDC.Source =
                         await

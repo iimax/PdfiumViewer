@@ -57,6 +57,7 @@ namespace PdfiumViewer.Demo
                 using (var form = new PrintPreviewDialog())
                 {
                     form.Document = _viewer.Document.CreatePrintDocument(settings);
+                    form.Document.DefaultPageSettings.Landscape = false;
                     form.ShowDialog(this);
                 }
 

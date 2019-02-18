@@ -55,6 +55,7 @@ namespace PdfiumViewer
             // Some printers misreport landscape. The below check verifies
             // whether the page rotation matches the landscape setting.
             bool inverseLandscape = e.PageSettings.Bounds.Width > e.PageSettings.Bounds.Height != e.PageSettings.Landscape;
+            //System.IO.File.WriteAllText(string.Format("{0}-1.log",DateTime.Now.ToString("HHmmss")), $"PageSettings={e.PageSettings.Bounds.ToString()}, Landscape={e.PageSettings.Landscape}");
 
             if (_settings.MultiplePages == null && _currentPage < _document.PageCount)
             {
@@ -76,7 +77,9 @@ namespace PdfiumViewer
                         landscape = !landscape;
 
                     e.PageSettings.Landscape = !landscape;
-                    System.Diagnostics.Debug.WriteLine(string.Format("page# {0} reverse landscape to {1}", _currentPage * (_settings.MultiplePages.Horizontal * _settings.MultiplePages.Vertical), e.PageSettings.Landscape));
+                    //System.IO.File.WriteAllText(string.Format("{0}-Reverse.log", DateTime.Now.ToString("HHmmss")), string.Format("page# {0} reverse landscape to {1}", _currentPage * (_settings.MultiplePages.Horizontal * _settings.MultiplePages.Vertical), e.PageSettings.Landscape));
+                    
+                    //System.Diagnostics.Debug.WriteLine(string.Format("page# {0} reverse landscape to {1}", _currentPage * (_settings.MultiplePages.Horizontal * _settings.MultiplePages.Vertical), e.PageSettings.Landscape));
                 }
                 else
                 {
@@ -219,19 +222,32 @@ namespace PdfiumViewer
             left += (width - scaledWidth) / 2;
             top += (height - scaledHeight) / 2;
 
-            _document.Render(
-                page,
-                e.Graphics,
+            //var img = _document.Render(page, Convert.ToInt32(width), Convert.ToInt32(height), 96, 96, PdfRotation.Rotate0, PdfRenderFlags.Annotations);
+            //img.Save(string.Format("{0}.jpg", DateTime.Now.ToString("yyyyMMddHHmmss")));
+
+            //由于RenderPDFPageToDC无法显示 annotation(比如电子章)，这里先把页面转为图片，然后再打印
+            Image image = _document.Render(page,
+                AdjustDpi(e.Graphics.DpiX, scaledWidth),
+                AdjustDpi(e.Graphics.DpiY, scaledHeight),
                 e.Graphics.DpiX,
                 e.Graphics.DpiY,
-                new Rectangle(
-                    AdjustDpi(e.Graphics.DpiX, left),
-                    AdjustDpi(e.Graphics.DpiY, top),
-                    AdjustDpi(e.Graphics.DpiX, scaledWidth),
-                    AdjustDpi(e.Graphics.DpiY, scaledHeight)
-                ),
-                PdfRenderFlags.ForPrinting | PdfRenderFlags.Annotations
-            );
+                PdfRotation.Rotate0, PdfRenderFlags.ForPrinting | PdfRenderFlags.Annotations);
+
+            e.Graphics.DrawImageUnscaled(image, e.PageBounds.Location);
+
+            //_document.Render(
+            //    page,
+            //    e.Graphics,
+            //    e.Graphics.DpiX,
+            //    e.Graphics.DpiY,
+            //    new Rectangle(
+            //        AdjustDpi(e.Graphics.DpiX, left),
+            //        AdjustDpi(e.Graphics.DpiY, top),
+            //        AdjustDpi(e.Graphics.DpiX, scaledWidth),
+            //        AdjustDpi(e.Graphics.DpiY, scaledHeight)
+            //    ),
+            //    PdfRenderFlags.ForPrinting | PdfRenderFlags.Annotations
+            //);
         }
 
         private static void Swap(ref double a, ref double b)
@@ -274,17 +290,20 @@ namespace PdfiumViewer
 
             int pagesPerPage = settings.Horizontal * settings.Vertical;
             int pageCount = (_document.PageCount - 1) / pagesPerPage + 1;
-
-            
             
             if (_currentPage < pageCount)
             {
                 float width = e.PageBounds.Width - e.PageSettings.HardMarginX * 2;
                 float height = e.PageBounds.Height - e.PageSettings.HardMarginY * 2;
-
+                //System.IO.File.WriteAllText(string.Format("Page {0}-{1}.log", _currentPage, DateTime.Now.ToString("HHmmss"))
+                //    , $"PageSettings={e.PageBounds.ToString()}, Rows={_settings.MultiPageLayout.Rows}, Columns={_settings.MultiPageLayout.Columns}");
+                //e.Cancel = true;
+                //return;
                 float widthPerPage = (width - (settings.Horizontal - 1) * settings.Margin) / settings.Horizontal;
                 float heightPerPage = (height - (settings.Vertical - 1) * settings.Margin) / settings.Vertical;
                 //提前根据用户自定义布局，计算好每页pdf内容输出的坐标：
+                //StringBuilder sb = new StringBuilder();
+                //sb.AppendFormat("PageBounds={0}\r\n", e.PageBounds.ToString());
                 if (_settings.MultiPageLayout.MultiPageOrder == PdfMultiPageOrder.Horizontal)
                 {
                     if (lstPdfPagePrintArea.Count == 0)
@@ -295,14 +314,15 @@ namespace PdfiumViewer
                         int drawedPages = 0;
                         for (int physicalPage = 0; physicalPage < pageCount; physicalPage++)
                         {
-                            x = 0;
-                            y = 0;
+                            x = 0;// + e.PageSettings.HardMarginX;
+                            y = 0;// + e.PageSettings.HardMarginY;
 
                             for (int i = 0; i < _settings.MultiPageLayout.Rows; i++)
                             {
                                 for (int j = 0; j < _settings.MultiPageLayout.Columns; j++)
                                 {
                                     lstPdfPagePrintArea.Add(new RectangleF(x, y, widthPerPage, heightPerPage));
+                                    //sb.AppendFormat("Page# {0},{1} width={2}, height={3}\r\n", x, y, widthPerPage, heightPerPage);
                                     x += widthPerPage + settings.Margin;
                                     drawedPages++;
                                     if (drawedPages >= _document.PageCount)
@@ -314,10 +334,12 @@ namespace PdfiumViewer
                                 {
                                     break;
                                 }
-                                x = 0;
+                                x = 0;// + e.PageSettings.HardMarginX;
                                 y += heightPerPage + settings.Margin;
                             }
                         }
+
+                        //System.IO.File.WriteAllText("PageLayout.log", sb.ToString());
                     }
 
                     
@@ -333,8 +355,8 @@ namespace PdfiumViewer
                         int drawedPages = 0;
                         for (int physicalPage = 0; physicalPage < pageCount; physicalPage++)
                         {
-                            x = 0;
-                            y = 0;
+                            x = 0;// + e.PageSettings.HardMarginX;
+                            y = 0;// + e.PageSettings.HardMarginY;
 
                             for (int i = 0; i < _settings.MultiPageLayout.Columns; i++)
                             {
@@ -352,7 +374,7 @@ namespace PdfiumViewer
                                 {
                                     break;
                                 }
-                                y = 0;
+                                y = 0;// + e.PageSettings.HardMarginY;
                                 x += widthPerPage + settings.Margin;
                             }
                             
@@ -380,11 +402,18 @@ namespace PdfiumViewer
                         printWidth = printWidth * ratio;
                         printHeight = printHeight * ratio;
                     }
-                    e.Graphics.DrawImage(image, lstPdfPagePrintArea[i].X, lstPdfPagePrintArea[i].Y, printWidth, printHeight);
+                    //将pdf内容页，放在本区域的中心位置
+                    var offsetCenterX = lstPdfPagePrintArea[i].Width - printWidth;
+                    var offsetCenterY = lstPdfPagePrintArea[i].Height - printHeight;
+                    offsetCenterX = offsetCenterX > 0 ? (offsetCenterX / 2) : 0;
+                    offsetCenterY = offsetCenterY > 0 ? (offsetCenterY / 2) : 0;
 
-                    float centerX = lstPdfPagePrintArea[i].X + lstPdfPagePrintArea[i].Width / 2;
-                    float centerY = lstPdfPagePrintArea[i].Y + lstPdfPagePrintArea[i].Height / 2;
-                    e.Graphics.DrawString(string.Format("#{0}", i + 1), new Font("微软雅黑", 22), Brushes.Red, centerX, centerY);
+                    e.Graphics.DrawImage(image, lstPdfPagePrintArea[i].X + offsetCenterX, lstPdfPagePrintArea[i].Y + offsetCenterY, printWidth, printHeight);
+                    //System.IO.File.WriteAllText(string.Format("Page {0} Render.log", i)
+                    //    , $"x={lstPdfPagePrintArea[i].X} + {offsetCenterX}, y={lstPdfPagePrintArea[i].Y} + {offsetCenterY}, printWidth={printWidth}, {printHeight}. image={image.Width}, {image.Height}");
+                    //float centerX = lstPdfPagePrintArea[i].X + lstPdfPagePrintArea[i].Width / 2;
+                    //float centerY = lstPdfPagePrintArea[i].Y + lstPdfPagePrintArea[i].Height / 2;
+                    //e.Graphics.DrawString(string.Format("#{0}", i + 1), new Font("微软雅黑", 22), Brushes.Red, centerX, centerY);
 
 
                     if (_settings.MultiPageLayout.DrawBorder)

@@ -42,12 +42,16 @@ namespace PdfiumViewer
 
         public bool RenderPDFPageToDC(int pageNumber, IntPtr dc, int dpiX, int dpiY, int boundsOriginX, int boundsOriginY, int boundsWidth, int boundsHeight, NativeMethods.FPDF flags)
         {
+            //TODO:为什么RenderToDC就不提供 renderFormFill参数？ 这样会导致一些电子签章无法显示。 RenderPDFPageToBitmap方法可以显示出签章
             if (_disposed)
                 throw new ObjectDisposedException(GetType().Name);
 
             using (var pageData = new PageData(_document, _form, pageNumber))
             {
+                
                 NativeMethods.FPDF_RenderPage(dc, pageData.Page, boundsOriginX, boundsOriginY, boundsWidth, boundsHeight, 0, flags);
+
+                //NativeMethods.FPDF_FFLDraw(_form, dc, pageData.Page, boundsOriginX, boundsOriginY, boundsWidth, boundsHeight, 0, flags);
             }
 
             return true;
