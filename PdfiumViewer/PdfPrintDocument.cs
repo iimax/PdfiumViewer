@@ -69,28 +69,36 @@ namespace PdfiumViewer
 
             if (_settings.MultiplePages != null) // multiple page per sheet printing
             {
-                if (_settings.MultiplePages.Horizontal == 1 || _settings.MultiplePages.Vertical == 1) //reverse landscape to get best size
+                try
                 {
-                    bool landscape = GetOrientation(_document.PageSizes[_currentPage]) == Orientation.Landscape;
+                    if (_settings.MultiplePages.Horizontal == 1 || _settings.MultiplePages.Vertical == 1) //reverse landscape to get best size
+                    {
+                        bool landscape = GetOrientation(_document.PageSizes[_currentPage]) == Orientation.Landscape;
 
-                    if (inverseLandscape)
-                        landscape = !landscape;
+                        if (inverseLandscape)
+                            landscape = !landscape;
 
-                    e.PageSettings.Landscape = !landscape;
-                    //System.IO.File.WriteAllText(string.Format("{0}-Reverse.log", DateTime.Now.ToString("HHmmss")), string.Format("page# {0} reverse landscape to {1}", _currentPage * (_settings.MultiplePages.Horizontal * _settings.MultiplePages.Vertical), e.PageSettings.Landscape));
-                    
-                    //System.Diagnostics.Debug.WriteLine(string.Format("page# {0} reverse landscape to {1}", _currentPage * (_settings.MultiplePages.Horizontal * _settings.MultiplePages.Vertical), e.PageSettings.Landscape));
+                        e.PageSettings.Landscape = !landscape;
+                        //System.IO.File.WriteAllText(string.Format("{0}-Reverse.log", DateTime.Now.ToString("HHmmss")), string.Format("page# {0} reverse landscape to {1}", _currentPage * (_settings.MultiplePages.Horizontal * _settings.MultiplePages.Vertical), e.PageSettings.Landscape));
+
+                        //System.Diagnostics.Debug.WriteLine(string.Format("page# {0} reverse landscape to {1}", _currentPage * (_settings.MultiplePages.Horizontal * _settings.MultiplePages.Vertical), e.PageSettings.Landscape));
+                    }
+                    else
+                    {
+                        //keep it's landscape
+                        bool landscape = GetOrientation(_document.PageSizes[_currentPage]) == Orientation.Landscape;
+
+                        if (inverseLandscape)
+                            landscape = !landscape;
+
+                        e.PageSettings.Landscape = landscape;
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    //keep it's landscape
-                    bool landscape = GetOrientation(_document.PageSizes[_currentPage]) == Orientation.Landscape;
-
-                    if (inverseLandscape)
-                        landscape = !landscape;
-
-                    e.PageSettings.Landscape = landscape;
+                    Console.WriteLine("ErrorWhileQueryPage. {0}", ex.ToString());
                 }
+                
             }
 
             base.OnQueryPageSettings(e);
@@ -99,7 +107,7 @@ namespace PdfiumViewer
         protected override void OnPrintPage(PrintPageEventArgs e)
         {
             OnBeforePrintPage(e);
-
+            
             if (_settings.MultiplePages != null)
                 PrintMultiplePagesAdvanced(e);
             else
@@ -192,8 +200,9 @@ namespace PdfiumViewer
                     Swap(ref height, ref width);
                     Swap(ref left, ref top);
                 }
-
+                Console.WriteLine("[{0}]OnPrintPage Render#{1}", DateTime.Now.ToString("HH:mm:ss.fff"), _currentPage);
                 RenderPage(e, _currentPage, left, top, width, height);
+                //Console.WriteLine("[Pdfium]OnPrintPage Render#{0} END", _currentPage);
                 _currentPage++;
             }
 
@@ -225,29 +234,54 @@ namespace PdfiumViewer
             //var img = _document.Render(page, Convert.ToInt32(width), Convert.ToInt32(height), 96, 96, PdfRotation.Rotate0, PdfRenderFlags.Annotations);
             //img.Save(string.Format("{0}.jpg", DateTime.Now.ToString("yyyyMMddHHmmss")));
 
-            //由于RenderPDFPageToDC无法显示 annotation(比如电子章)，这里先把页面转为图片，然后再打印
-            Image image = _document.Render(page,
+            // RenderPDFPageToDC was not able to render annotation(比如电子章)，render to bitmap, then print
+            //if (_settings != null)
+            //{
+            //    _settings.PrintAsImage = true;
+            //}
+            if (_settings != null && _settings.PrintAsImage)
+            {
+                Image image = _document.Render(page,
                 AdjustDpi(e.Graphics.DpiX, scaledWidth),
                 AdjustDpi(e.Graphics.DpiY, scaledHeight),
                 e.Graphics.DpiX,
                 e.Graphics.DpiY,
                 PdfRotation.Rotate0, PdfRenderFlags.ForPrinting | PdfRenderFlags.Annotations);
 
-            e.Graphics.DrawImageUnscaled(image, e.PageBounds.Location);
+                e.Graphics.DrawImageUnscaled(image, e.PageBounds.Location);
+                image.Dispose();
+                image = null;
+            }
+            else
+            {
+                _document.Render(
+                    page,
+                    e.Graphics,
+                    e.Graphics.DpiX,
+                    e.Graphics.DpiY,
+                    new Rectangle(
+                        AdjustDpi(e.Graphics.DpiX, left),
+                        AdjustDpi(e.Graphics.DpiY, top),
+                        AdjustDpi(e.Graphics.DpiX, scaledWidth),
+                        AdjustDpi(e.Graphics.DpiY, scaledHeight)
+                    ),
+                    PdfRenderFlags.ForPrinting | PdfRenderFlags.Annotations
+                );
+            }
 
             //_document.Render(
-            //    page,
-            //    e.Graphics,
-            //    e.Graphics.DpiX,
-            //    e.Graphics.DpiY,
-            //    new Rectangle(
-            //        AdjustDpi(e.Graphics.DpiX, left),
-            //        AdjustDpi(e.Graphics.DpiY, top),
-            //        AdjustDpi(e.Graphics.DpiX, scaledWidth),
-            //        AdjustDpi(e.Graphics.DpiY, scaledHeight)
-            //    ),
-            //    PdfRenderFlags.ForPrinting | PdfRenderFlags.Annotations
-            //);
+            //        page,
+            //        e.Graphics,
+            //        e.Graphics.DpiX,
+            //        e.Graphics.DpiY,
+            //        new Rectangle(
+            //            AdjustDpi(e.Graphics.DpiX, left),
+            //            AdjustDpi(e.Graphics.DpiY, top),
+            //            AdjustDpi(e.Graphics.DpiX, scaledWidth),
+            //            AdjustDpi(e.Graphics.DpiY, scaledHeight)
+            //        ),
+            //        PdfRenderFlags.ForPrinting | PdfRenderFlags.Annotations
+            //    );
         }
 
         private static void Swap(ref double a, ref double b)

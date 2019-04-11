@@ -194,7 +194,9 @@ namespace PdfiumViewer.Demo
         {
             using (var form = new PrintPreviewDialog())
             {
-                form.Document = pdfViewer1.Document.CreatePrintDocument(pdfViewer1.DefaultPrintMode);
+                var setting = new PdfPrintSettings(pdfViewer1.DefaultPrintMode, null);
+                setting.PrintAsImage = true;
+                form.Document = pdfViewer1.Document.CreatePrintDocument(setting);
                 form.ShowDialog(this);
             }
         }

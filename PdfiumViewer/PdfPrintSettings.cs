@@ -31,10 +31,9 @@ namespace PdfiumViewer
         {
             Mode = mode;
             MultiplePages = multiplePages;
-
             MultiPageLayout = new PdfPrintMultiPageLayout();
         }
-
+        
         /// <summary>
         /// Creates a new instance of the PdfPrintSettings class.
         /// </summary>
@@ -75,6 +74,11 @@ namespace PdfiumViewer
         public PdfPageLayoutMode PageLayoutMode { get; set; } = PdfPageLayoutMode.SinglePage;
 
         public PdfPrintMultiPageLayout MultiPageLayout { get; set; }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public bool PrintAsImage { get; set; }
 
 
         public void SetMultiPageLayout(int rows, int columns, bool hasPageBorder, PdfMultiPageOrder pageOrder)
